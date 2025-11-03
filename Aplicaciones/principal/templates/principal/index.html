@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Predicción Riesgo Cardiovascular</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .main-card {
+            max-width: 980px;
+            margin: 32px auto;
+            background: #fff;
+            padding: 24px 32px;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            margin-bottom: 24px;
+            color: #1b4965;
+        }
+        form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px 24px;
+        }
+        fieldset {
+            border: 1px solid #d0dbe5;
+            border-radius: 10px;
+            padding: 12px 16px;
+        }
+        legend {
+            font-weight: bold;
+            color: #1b4965;
+        }
+        label {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+        }
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d0dbe5;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        .radio-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .actions {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-card">
+        <h1>Calculadora de Riesgo Cardiovascular a 10 años</h1>
+
+        {% if errores %}
+            <div class="alert alert-danger">
+                {{ errores }}
+            </div>
+        {% endif %}
+
+        {% if probabilidad != None %}
+            <div class="d-flex justify-content-end mb-3">
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#resultadoModal">
+                    Ver resultado de la predicción
+                </button>
+            </div>
+        {% endif %}
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <fieldset>
+                <legend>Sexo</legend>
+                {% with valores.male|stringformat:"s" as male_value %}
+                    <div class="radio-group">
+                        <input type="radio" id="male_no" name="male" value="0" {% if male_value == "0" %}checked{% endif %}>
+                        <label for="male_no">Femenino</label>
+                    </div>
+                    <div class="radio-group">
+                        <input type="radio" id="male_yes" name="male" value="1" {% if male_value == "1" %}checked{% endif %}>
+                        <label for="male_yes">Masculino</label>
+                    </div>
+                {% endwith %}
+            </fieldset>
+
+            <fieldset>
+                <legend>Edad</legend>
+                <label for="age">Edad (años)</label>
+                <input type="number" id="age" name="age" min="0" step="1" value="{{ valores.age }}" required>
+            </fieldset>
+
+            <fieldset>
+                <legend>Educación</legend>
+                <label for="education">Nivel educativo</label>
+                <select id="education" name="education">
+                    {% for nivel in "1234" %}
+                        <option value="{{ nivel }}" {% if valores.education|stringformat:"s" == nivel %}selected{% endif %}>
+                            {{ nivel }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </fieldset>
+
+            <fieldset>
+                <legend>Tabaquismo</legend>
+                <label>¿Fumador actual?</label>
+                {% with valores.currentSmoker|stringformat:"s" as smoker_value %}
+                    <div class="radio-group">
+                        <input type="radio" id="smoker_no" name="currentSmoker" value="0" {% if smoker_value == "0" %}checked{% endif %}>
+                        <label for="smoker_no">No</label>
+                    </div>
+                    <div class="radio-group">
+                        <input type="radio" id="smoker_yes" name="currentSmoker" value="1" {% if smoker_value == "1" %}checked{% endif %}>
+                        <label for="smoker_yes">Sí</label>
+                    </div>
+                {% endwith %}
+                <label for="cigsPerDay">Cigarrillos por día</label>
+                <input type="number" id="cigsPerDay" name="cigsPerDay" min="0" step="1" value="{{ valores.cigsPerDay }}">
+            </fieldset>
+
+            <fieldset>
+                <legend>Tratamiento</legend>
+                <label>¿Bajo medicamento para presión (BP Meds)?</label>
+                {% with valores.BPMeds|stringformat:"s" as bp_value %}
+                    <div class="radio-group">
+                        <input type="radio" id="bp_no" name="BPMeds" value="0" {% if bp_value == "0" %}checked{% endif %}>
+                        <label for="bp_no">No</label>
+                    </div>
+                    <div class="radio-group">
+                        <input type="radio" id="bp_yes" name="BPMeds" value="1" {% if bp_value == "1" %}checked{% endif %}>
+                        <label for="bp_yes">Sí</label>
+                    </div>
+                {% endwith %}
+            </fieldset>
+
+            <fieldset>
+                <legend>Antecedentes</legend>
+                <label>Accidente cerebrovascular previo</label>
+                {% with valores.prevalentStroke|stringformat:"s" as stroke_value %}
+                    <div class="radio-group">
+                        <input type="radio" id="stroke_no" name="prevalentStroke" value="0" {% if stroke_value == "0" %}checked{% endif %}>
+                        <label for="stroke_no">No</label>
+                    </div>
+                    <div class="radio-group">
+                        <input type="radio" id="stroke_yes" name="prevalentStroke" value="1" {% if stroke_value == "1" %}checked{% endif %}>
+                        <label for="stroke_yes">Sí</label>
+                    </div>
+                {% endwith %}
+
+                <label>Hipertensión prevalente</label>
+                {% with valores.prevalentHyp|stringformat:"s" as hyp_value %}
+                    <div class="radio-group">
+                        <input type="radio" id="hyp_no" name="prevalentHyp" value="0" {% if hyp_value == "0" %}checked{% endif %}>
+                        <label for="hyp_no">No</label>
+                    </div>
+                    <div class="radio-group">
+                        <input type="radio" id="hyp_yes" name="prevalentHyp" value="1" {% if hyp_value == "1" %}checked{% endif %}>
+                        <label for="hyp_yes">Sí</label>
+                    </div>
+                {% endwith %}
+
+                <label>Diabetes</label>
+                {% with valores.diabetes|stringformat:"s" as diabetes_value %}
+                    <div class="radio-group">
+                        <input type="radio" id="diabetes_no" name="diabetes" value="0" {% if diabetes_value == "0" %}checked{% endif %}>
+                        <label for="diabetes_no">No</label>
+                    </div>
+                    <div class="radio-group">
+                        <input type="radio" id="diabetes_yes" name="diabetes" value="1" {% if diabetes_value == "1" %}checked{% endif %}>
+                        <label for="diabetes_yes">Sí</label>
+                    </div>
+                {% endwith %}
+            </fieldset>
+
+            <fieldset>
+                <legend>Perfil lipídico</legend>
+                <label for="totChol">Colesterol total (mg/dL)</label>
+                <input type="number" id="totChol" name="totChol" min="0" step="1" value="{{ valores.totChol }}">
+                <label for="glucose">Glucosa (mg/dL)</label>
+                <input type="number" id="glucose" name="glucose" min="0" step="1" value="{{ valores.glucose }}">
+            </fieldset>
+
+            <fieldset>
+                <legend>Presión arterial</legend>
+                <label for="sysBP">Presión sistólica (mmHg)</label>
+                <input type="number" id="sysBP" name="sysBP" min="0" step="1" value="{{ valores.sysBP }}">
+                <label for="diaBP">Presión diastólica (mmHg)</label>
+                <input type="number" id="diaBP" name="diaBP" min="0" step="1" value="{{ valores.diaBP }}">
+            </fieldset>
+
+            <fieldset>
+                <legend>Salud general</legend>
+                <label for="BMI">Índice de masa corporal</label>
+                <input type="number" id="BMI" name="BMI" min="0" step="0.1" value="{{ valores.BMI }}">
+                <label for="heartRate">Frecuencia cardiaca (latidos/min)</label>
+                <input type="number" id="heartRate" name="heartRate" min="0" step="1" value="{{ valores.heartRate }}">
+            </fieldset>
+
+            <div class="actions">
+                <button type="submit" class="btn btn-success">Calcular riesgo</button>
+            </div>
+        </form>
+    </div>
+
+    {% if probabilidad != None and equation %}
+        <div class="modal fade" id="resultadoModal" tabindex="-1" aria-labelledby="resultadoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="resultadoModalLabel">Resultado de la predicción</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="lead fw-semibold mb-1 {{ probabilidad_clase }}">
+                            Probabilidad estimada: {{ probabilidad_pct|floatformat:2 }}%
+                        </p>
+                        <p class="mb-3">
+                            Clasificación: <span class="fw-semibold {{ probabilidad_clase }}">
+                                {% if prediccion %}Mayor riesgo{% else %}Riesgo bajo{% endif %}
+                            </span>
+                        </p>
+
+                        <div class="accordion" id="accordionResultado">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingFormula">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFormula" aria-expanded="true" aria-controls="collapseFormula">
+                                        Ver resolución de la ecuación logística
+                                    </button>
+                                </h2>
+                                <div id="collapseFormula" class="accordion-collapse collapse show" aria-labelledby="headingFormula" data-bs-parent="#accordionResultado">
+                                    <div class="accordion-body">
+                                        <p class="small text-muted">
+                                            El modelo estandariza las variables numéricas antes de aplicar los coeficientes. A continuación se muestran los aportes de cada término y la fórmula con los valores capturados.
+                                        </p>
+                                        <p><strong>Ecuación con valores capturados:</strong></p>
+                                        <pre class="bg-light p-3 rounded">{{ equation.raw_formula }}</pre>
+
+                                        <p class="mt-3"><strong>Cálculo paso a paso (valores estandarizados):</strong></p>
+                                        <ul class="list-group">
+                                            {% for term in equation.terms %}
+                                                <li class="list-group-item">
+                                                    <div class="fw-semibold">{{ term.name }}</div>
+                                                    <div class="small text-muted">
+                                                        Coeficiente: {{ term.coefficient|floatformat:6 }} |
+                                                        Valor estandarizado: {{ term.transformed|floatformat:6 }} |
+                                                        Aporte: {{ term.product|floatformat:6 }}
+                                                    </div>
+                                                    <div class="small">
+                                                        Valor original: {{ term.raw }}
+                                                        {% if term.mean != None and term.scale != None %}
+                                                            (media: {{ term.mean|floatformat:3 }}, desviación: {{ term.scale|floatformat:3 }})
+                                                        {% endif %}
+                                                    </div>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+
+                                        <p class="mt-3 mb-1">
+                                            z = {{ equation.intercept|floatformat:6 }} + Σ aportes = <strong>{{ equation.logit|floatformat:6 }}</strong>
+                                        </p>
+                                        <p class="mb-0">
+                                            P(TenYearCHD = 1) = 1 / (1 + e<sup>-z</sup>) = <strong>{{ probabilidad|floatformat:6 }}</strong>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% if probabilidad != None and equation %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var modalElement = document.getElementById('resultadoModal');
+                if (modalElement) {
+                    var modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                }
+            });
+        </script>
+    {% endif %}
+</body>
+</html>
