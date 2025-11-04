@@ -7,6 +7,7 @@ from django.conf import settings
 from django.shortcuts import render
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -80,7 +81,7 @@ def _probability_css(probability_pct):
 def _get_pipeline():
     """Entrena el modelo una sola vez y lo guarda en caché."""
     csv_path = Path(settings.BASE_DIR) / "media" / "framingham.csv"
-    data = pd.read_csv(csv_path)
+    data = pd.read_csv(csv_path, na_values=["NA", "NaN", ""])
 
     missing_cols = [col for col in EXPECTED_COLUMNS if col not in data.columns]
     if missing_cols:
@@ -91,6 +92,14 @@ def _get_pipeline():
     data = data[EXPECTED_COLUMNS].dropna().reset_index(drop=True)
     X = data[EXPECTED_COLUMNS[:-1]]
     y = data[TARGET_FEATURE].astype(int)
+
+    X_train, X_valid, y_train, y_valid = train_test_split(
+        X,
+        y,
+        test_size=0.3,
+        random_state=42,
+        stratify=y,
+    )
 
     preprocessor = ColumnTransformer(
         transformers=[
@@ -113,7 +122,8 @@ def _get_pipeline():
         ]
     )
 
-    model.fit(X, y)
+    model.fit(X_train, y_train)
+    model.validation_score_ = float(model.score(X_valid, y_valid))
     return model
 
 

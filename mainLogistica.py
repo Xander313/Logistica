@@ -13,13 +13,14 @@ import sys
 import os
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.model_selection import StratifiedKFold, GridSearchCV, train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import classification_report, roc_auc_score, roc_curve
 
 
 # ======================================================
@@ -40,7 +41,7 @@ def main():
         sys.exit(1)
 
     print("\n📥 Leyendo dataset...")
-    df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path, na_values=["NA", "NaN", ""])
 
     # Variables esperadas
     expected = [
@@ -63,6 +64,14 @@ def main():
     # X = variables independientes, Y = etiqueta
     X = df[expected[:-1]]
     y = df['TenYearCHD'].astype(int)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.3,
+        random_state=42,
+        stratify=y,
+    )
 
     numeric_cols = [
         'male','age','currentSmoker','cigsPerDay','BPMeds','prevalentStroke',
@@ -88,19 +97,33 @@ def main():
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
     grid = GridSearchCV(model, param_grid, cv=cv, scoring="roc_auc", refit=True)
-    grid.fit(X, y)
+    print(f"📊 Registros de entrenamiento: {len(X_train)}")
+    print(f"📊 Registros de validación: {len(X_test)}\n")
+
+    grid.fit(X_train, y_train)
 
     best_model = grid.best_estimator_
 
     print("✅ Mejor parámetro C encontrado:", grid.best_params_["logreg__C"], "\n")
 
     # Predicciones
-    y_pred = best_model.predict(X)
-    y_prob = best_model.predict_proba(X)[:, 1]
+    y_pred = best_model.predict(X_test)
+    y_prob = best_model.predict_proba(X_test)[:, 1]
 
     print("📊 Métricas del modelo:")
-    print(classification_report(y, y_pred))
-    print("AUC-ROC:", roc_auc_score(y, y_prob), "\n")
+    print(classification_report(y_test, y_pred))
+    auc_score = roc_auc_score(y_test, y_prob)
+    print("AUC-ROC:", auc_score, "\n")
+
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    plt.figure()
+    plt.plot(fpr, tpr, label=f"ROC (AUC = {auc_score:.3f})")
+    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Aleatorio")
+    plt.xlabel("Tasa de Falsos Positivos")
+    plt.ylabel("Tasa de Verdaderos Positivos")
+    plt.title("Curva ROC - Regresión Logística")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.5)
 
     # Extraer coeficientes
     ohe = best_model.named_steps["preprocess"].named_transformers_["cat"]
@@ -109,6 +132,10 @@ def main():
 
     coef = best_model.named_steps["logreg"].coef_.ravel()
     intercept = best_model.named_steps["logreg"].intercept_[0]
+
+    roc_path = os.path.join(os.path.dirname(csv_path), "logistic_roc_curve.png")
+    plt.savefig(roc_path, dpi=120, bbox_inches="tight")
+    plt.close()
 
     # Guardar salida
     out_txt = os.path.join(os.path.dirname(csv_path), "logistic_equation.txt")
@@ -121,6 +148,8 @@ def main():
 
     print("✅ Ecuación exportada en:")
     print(out_txt)
+    print("✅ Curva ROC exportada en:")
+    print(roc_path)
     print("\n🎯 ¡Modelo entrenado correctamente!\n")
 
 
